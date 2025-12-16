@@ -5,9 +5,9 @@ import { Link } from 'react-router-dom'
 import { api } from '@/lib/api'
 import { 
   Database, 
-  HardDrive, 
   Search, 
-  FileText,
+  Eye,
+  Calculator,
   CheckCircle,
   XCircle,
   Loader2
@@ -25,9 +25,9 @@ export function Home() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">SierraDB Inspector</h1>
+        <h1 className="text-3xl font-bold text-foreground">UmaDB Inspector</h1>
         <p className="text-muted-foreground mt-2">
-          Explore events, partitions, and streams in your SierraDB cluster
+          Search and explore events in your UmaDB event store
         </p>
       </div>
 
@@ -48,7 +48,7 @@ export function Home() {
             ) : isConnected ? (
               <>
                 <CheckCircle className="h-4 w-4 text-green-500" />
-                <span className="text-green-700">Connected to SierraDB</span>
+                <span className="text-green-700">Connected to UmaDB</span>
               </>
             ) : (
               <>
@@ -66,45 +66,28 @@ export function Home() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <HardDrive className="h-5 w-5" />
-              Partition Explorer
-            </CardTitle>
-            <CardDescription>
-              Browse events across 1,024 partitions by sequence number
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <Link to="/partitions">Explore Partitions</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Stream Explorer
-            </CardTitle>
-            <CardDescription>
-              Navigate streams and browse events by version number
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <Link to="/streams">Explore Streams</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
               <Search className="h-5 w-5" />
+              Event Search
+            </CardTitle>
+            <CardDescription>
+              Search and filter events by type, tags, position, and direction in the global stream
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link to="/search">Search Events</Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
               Event Lookup
             </CardTitle>
             <CardDescription>
-              Search for specific events by their unique identifier
+              Look up specific events by their unique identifier (UUID)
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -113,22 +96,41 @@ export function Home() {
             </Button>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Projections
+            </CardTitle>
+            <CardDescription>
+              Run custom JavaScript projections to analyze and aggregate events
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link to="/projections">Run Projections</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>About SierraDB</CardTitle>
+          <CardTitle>About UmaDB</CardTitle>
         </CardHeader>
         <CardContent className="prose prose-sm max-w-none">
           <p>
-            SierraDB is a distributed event sourcing database with 1,024 logical partitions.
-            Events are organized into streams with monotonic version numbers, while partitions
-            maintain global sequence numbers for ordering across streams.
+            UmaDB is an event store database that implements the Dynamic Consistency Boundaries 
+            specification. Events are stored in a single global stream and can be queried by 
+            event type and tags for flexible event filtering and aggregation.
           </p>
           <ul className="mt-4 space-y-2">
-            <li><strong>Partitions:</strong> 1,024 logical divisions for data distribution</li>
-            <li><strong>Streams:</strong> Append-only sequences of related events</li>
-            <li><strong>Events:</strong> Immutable records with timestamps and payloads</li>
+            <li><strong>Event Types:</strong> Logical categorization of events (e.g., UserCreated, OrderPlaced)</li>
+            <li><strong>Tags:</strong> Arbitrary string labels for flexible event filtering</li>
+            <li><strong>Global Stream:</strong> Single ordered sequence of all events with position numbers</li>
+            <li><strong>UUIDs:</strong> Unique identifiers for individual event lookup</li>
+            <li><strong>Projections:</strong> JavaScript functions that process events to build aggregated state for analytics</li>
           </ul>
         </CardContent>
       </Card>

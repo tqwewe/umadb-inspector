@@ -32,7 +32,8 @@ function project(state, event) {
     state = {
       eventCount: 0,
       eventsByType: {},
-      streamCount: {}
+      tagCounts: {},
+      positionRange: { min: null, max: null }
     };
   }
   
@@ -40,12 +41,23 @@ function project(state, event) {
   state.eventCount++;
   
   // Count events by type
-  state.eventsByType[event.event_name] = 
-    (state.eventsByType[event.event_name] || 0) + 1;
+  state.eventsByType[event.event_type] = 
+    (state.eventsByType[event.event_type] || 0) + 1;
   
-  // Count events by stream
-  state.streamCount[event.stream_id] = 
-    (state.streamCount[event.stream_id] || 0) + 1;
+  // Count tags
+  if (event.tags) {
+    for (const tag of event.tags) {
+      state.tagCounts[tag] = (state.tagCounts[tag] || 0) + 1;
+    }
+  }
+  
+  // Track position range
+  if (state.positionRange.min === null || event.position < state.positionRange.min) {
+    state.positionRange.min = event.position;
+  }
+  if (state.positionRange.max === null || event.position > state.positionRange.max) {
+    state.positionRange.max = event.position;
+  }
   
   return state;
 }`
@@ -83,9 +95,11 @@ export function ProjectionRunner() {
   const [isDebugging, setIsDebugging] = useState(false)
   const [debugSessionId, setDebugSessionId] = useState<string | null>(null)
   
-  // Stream mode state
-  const [streamMode, setStreamMode] = useState(editingProjection?.streamId ? true : false)
-  const [streamId, setStreamId] = useState(editingProjection?.streamId || '')
+  // Filter state
+  const [eventTypes, setEventTypes] = useState<string[]>(editingProjection?.eventTypes || [])
+  const [tags, setTags] = useState<string[]>(editingProjection?.tags || [])
+  const [newEventType, setNewEventType] = useState('')
+  const [newTag, setNewTag] = useState('')
 
   // Load projection when editing
   useEffect(() => {
@@ -95,10 +109,8 @@ export function ProjectionRunner() {
       setSaveDescription(editingProjection.description || '')
       setSaveCategory(editingProjection.category || '')
       setSaveRenderMode(editingProjection.renderMode)
-      if (editingProjection.streamId) {
-        setStreamMode(true)
-        setStreamId(editingProjection.streamId)
-      }
+      setEventTypes(editingProjection.eventTypes || [])
+      setTags(editingProjection.tags || [])
     }
   }, [editingProjection])
 
@@ -121,7 +133,8 @@ export function ProjectionRunner() {
           category: saveCategory,
           code,
           renderMode: saveRenderMode,
-          streamId: streamMode ? streamId : undefined
+          eventTypes: eventTypes.length > 0 ? eventTypes : undefined,
+          tags: tags.length > 0 ? tags : undefined
         })
       } else {
         // Save new projection
@@ -131,7 +144,8 @@ export function ProjectionRunner() {
           category: saveCategory,
           code,
           renderMode: saveRenderMode,
-          streamId: streamMode ? streamId : undefined
+          eventTypes: eventTypes.length > 0 ? eventTypes : undefined,
+          tags: tags.length > 0 ? tags : undefined
         })
       }
 
@@ -166,7 +180,8 @@ export function ProjectionRunner() {
       const requestBody: ProjectionRunRequest = {
         code,
         initialState: null,
-        ...(streamMode && streamId.trim() && { streamId: streamId.trim() })
+        ...(eventTypes.length > 0 && { eventTypes }),
+        ...(tags.length > 0 && { tags })
       }
 
       // Close existing EventSource if any
@@ -216,7 +231,7 @@ export function ProjectionRunner() {
                 // Skip empty data lines
                 if (jsonString.trim()) {
                   const data = JSON.parse(jsonString)
-                  if (data.current_partition !== undefined) {
+                  if (data.events_processed !== undefined) {
                     setProgress(data)
                     
                     if (data.status === 'completed' || data.status === 'error') {
@@ -237,7 +252,7 @@ export function ProjectionRunner() {
             const jsonString = buffer.substring(6)
             if (jsonString.trim()) {
               const data = JSON.parse(jsonString)
-              if (data.current_partition !== undefined) {
+              if (data.events_processed !== undefined) {
                 setProgress(data)
                 
                 if (data.status === 'completed' || data.status === 'error') {
@@ -256,8 +271,6 @@ export function ProjectionRunner() {
     } catch (error) {
       console.error('Error running projection:', error)
       setProgress({
-        current_partition: 0,
-        total_partitions: 0,
         events_processed: 0,
         current_state: null,
         status: 'error',
@@ -280,6 +293,30 @@ export function ProjectionRunner() {
     setCode(defaultProjectionCode)
   }
 
+  // Event type management functions
+  const addEventType = () => {
+    if (newEventType.trim() && !eventTypes.includes(newEventType.trim())) {
+      setEventTypes([...eventTypes, newEventType.trim()])
+      setNewEventType('')
+    }
+  }
+
+  const removeEventType = (eventType: string) => {
+    setEventTypes(eventTypes.filter(t => t !== eventType))
+  }
+
+  // Tag management functions  
+  const addTag = () => {
+    if (newTag.trim() && !tags.includes(newTag.trim())) {
+      setTags([...tags, newTag.trim()])
+      setNewTag('')
+    }
+  }
+
+  const removeTag = (tag: string) => {
+    setTags(tags.filter(t => t !== tag))
+  }
+
   // Debug mode functions
   const startDebugSession = async () => {
     if (isDebugging || !code.trim()) return
@@ -291,7 +328,8 @@ export function ProjectionRunner() {
       const response = await api.debugSessionStart({
         code,
         initialState: null,
-        ...(streamMode && streamId.trim() && { streamId: streamId.trim() })
+        ...(eventTypes.length > 0 && { eventTypes }),
+        ...(tags.length > 0 && { tags })
       })
 
       setDebugSessionId(response.sessionId)
@@ -363,8 +401,8 @@ export function ProjectionRunner() {
   }
 
   const getProgressPercentage = () => {
-    if (!progress || progress.total_partitions === 0) return 0
-    return Math.round((progress.current_partition / progress.total_partitions) * 100)
+    if (!progress || !progress.total_events_estimated || progress.total_events_estimated === 0) return 0
+    return Math.round((progress.events_processed / progress.total_events_estimated) * 100)
   }
 
   return (
@@ -379,7 +417,7 @@ export function ProjectionRunner() {
             <p className="text-muted-foreground mt-2">
               {editingProjection 
                 ? 'Edit and update your saved projection'
-                : 'Write and run custom projections across all events or specific streams in SierraDB'
+                : 'Write and run custom projections across all events or filtered by event types and tags in UmaDB'
               }
             </p>
           </div>
@@ -413,29 +451,98 @@ export function ProjectionRunner() {
               />
             </div>
             
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium">Stream Mode</label>
-              <input
-                type="checkbox"
-                checked={streamMode}
-                onChange={(e) => setStreamMode(e.target.checked)}
-                className="w-4 h-4"
-              />
-              {streamMode && (
-                <input
-                  type="text"
-                  placeholder="Enter stream ID"
-                  value={streamId}
-                  onChange={(e) => setStreamId(e.target.value)}
-                  className="ml-2 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              )}
+            <div className="text-sm text-muted-foreground">
+              Filters: {eventTypes.length} event types, {tags.length} tags
+              {eventTypes.length === 0 && tags.length === 0 && ' (all events)'}
             </div>
           </div>
         </div>
       </div>
       
       <div className="flex-1 min-h-0 p-6 pt-6">
+        {/* Event Filters Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Event Filters</CardTitle>
+            <CardDescription>
+              Filter events by type and tags. Leave empty to process all events.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Event Types */}
+              <div>
+                <h4 className="font-medium mb-3">Event Types</h4>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter event type (e.g., UserCreated, OrderPlaced)"
+                      value={newEventType}
+                      onChange={(e) => setNewEventType(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addEventType()}
+                      className="flex-1"
+                    />
+                    <Button onClick={addEventType} disabled={!newEventType.trim()} size="sm">
+                      Add
+                    </Button>
+                  </div>
+                  
+                  {eventTypes.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {eventTypes.map((eventType, index) => (
+                        <div key={index} className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded-md text-sm">
+                          <span>{eventType}</span>
+                          <button
+                            onClick={() => removeEventType(eventType)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <h4 className="font-medium mb-3">Tags</h4>
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter tag (e.g., user:123, urgent)"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && addTag()}
+                      className="flex-1"
+                    />
+                    <Button onClick={addTag} disabled={!newTag.trim()} size="sm">
+                      Add
+                    </Button>
+                  </div>
+                  
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map((tag, index) => (
+                        <div key={index} className="flex items-center gap-1 bg-green-100 text-green-800 px-2 py-1 rounded-md text-sm">
+                          <span>{tag}</span>
+                          <button
+                            onClick={() => removeTag(tag)}
+                            className="text-green-600 hover:text-green-800"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
           {/* Code Editor */}
           <Card className="lg:col-span-1 flex flex-col h-full">
@@ -671,18 +778,27 @@ export function ProjectionRunner() {
                     {/* Progress Bar */}
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span>Processing Partitions</span>
-                        <span>{progress.current_partition} / {progress.total_partitions}</span>
+                        <span>Processing Events</span>
+                        <span>{progress.events_processed.toLocaleString()} events</span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${getProgressPercentage()}%` }}
-                        />
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {getProgressPercentage()}% complete • {progress.events_processed.toLocaleString()} events processed
-                      </div>
+                      {progress.total_events_estimated && (
+                        <>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${getProgressPercentage()}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {getProgressPercentage()}% complete • {progress.events_processed.toLocaleString()} of {progress.total_events_estimated.toLocaleString()} events
+                          </div>
+                        </>
+                      )}
+                      {!progress.total_events_estimated && (
+                        <div className="text-xs text-muted-foreground">
+                          {progress.events_processed.toLocaleString()} events processed
+                        </div>
+                      )}
                     </div>
 
                     {/* Status */}

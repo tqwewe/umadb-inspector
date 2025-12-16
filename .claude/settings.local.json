@@ -11,7 +11,8 @@
       "Bash(npm uninstall:*)",
       "Bash(npm run client:build:*)",
       "WebFetch(domain:github.com)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "WebFetch(domain:umadb.io)"
     ],
     "deny": []
   }

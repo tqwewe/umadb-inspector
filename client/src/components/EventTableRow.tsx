@@ -1,7 +1,6 @@
-import { SierraDBEvent } from '../types.js'
+import { UmaDBEvent } from '../types.js'
 import { TableCell, TableRow } from '@/components/ui/table'
 import { JsonViewer } from '@/components/JsonViewer'
-import { useTimestamp } from '@/contexts/TimestampContext'
 import { 
   ChevronDown,
   ChevronRight,
@@ -45,12 +44,11 @@ function CopyableField({ value, children, className = "" }: CopyableFieldProps) 
 }
 
 interface EventTableRowProps {
-  event: SierraDBEvent
+  event: UmaDBEvent
 }
 
 export function EventTableRow({ event }: EventTableRowProps) {
   const [expanded, setExpanded] = useState(false)
-  const { formatTimestamp } = useTimestamp()
 
   return (
     <>
@@ -61,36 +59,49 @@ export function EventTableRow({ event }: EventTableRowProps) {
         <TableCell className="w-[30px] p-2">
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </TableCell>
-        <TableCell className="font-medium">
-          {event.event_name}
+        <TableCell className="font-semibold text-purple-700">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+              {event.event_type}
+            </span>
+          </div>
+        </TableCell>
+        <TableCell className="min-w-[320px] w-[320px]">
+          {event.uuid ? (
+            <CopyableField value={event.uuid} className="font-mono text-xs text-gray-600 whitespace-nowrap overflow-hidden text-ellipsis block w-full">
+              {event.uuid}
+            </CopyableField>
+          ) : (
+            <span className="text-xs text-muted-foreground italic">
+              No UUID provided
+            </span>
+          )}
+        </TableCell>
+        <TableCell className="text-center font-mono text-sm font-medium">
+          {event.position.toLocaleString()}
         </TableCell>
         <TableCell>
-          <CopyableField value={event.event_id} className="font-mono text-sm">
-            {event.event_id}
-          </CopyableField>
-        </TableCell>
-        <TableCell>
-          <CopyableField value={event.stream_id} className="font-mono text-sm">
-            {event.stream_id}
-          </CopyableField>
-        </TableCell>
-        <TableCell className="text-center">
-          {event.partition_id}
-        </TableCell>
-        <TableCell className="text-center">
-          {event.partition_sequence}
-        </TableCell>
-        <TableCell className="text-center">
-          {event.stream_version}
-        </TableCell>
-        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-          {formatTimestamp(event.timestamp)}
+          <div className="flex flex-wrap gap-1">
+            {event.tags.slice(0, 3).map((tag, index) => (
+              <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                {tag}
+              </span>
+            ))}
+            {event.tags.length > 3 && (
+              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                +{event.tags.length - 3} more
+              </span>
+            )}
+            {event.tags.length === 0 && (
+              <span className="text-muted-foreground text-xs italic">No tags</span>
+            )}
+          </div>
         </TableCell>
       </TableRow>
       
       {expanded && (
         <TableRow>
-          <TableCell colSpan={8} className="p-0">
+          <TableCell colSpan={5} className="p-0">
             <div className="bg-muted/30 p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -98,54 +109,68 @@ export function EventTableRow({ event }: EventTableRowProps) {
                     <Hash className="h-4 w-4" />
                     Event Details
                   </h4>
-                  <div className="space-y-2 text-sm">
-                    <div><strong>Event ID:</strong> <CopyableField value={event.event_id} className="font-mono">{event.event_id}</CopyableField></div>
-                    <div><strong>Stream ID:</strong> <CopyableField value={event.stream_id} className="font-mono">{event.stream_id}</CopyableField></div>
-                    <div><strong>Transaction ID:</strong> <CopyableField value={event.transaction_id} className="font-mono">{event.transaction_id}</CopyableField></div>
-                    <div><strong>Partition Key:</strong> <CopyableField value={event.partition_key} className="font-mono">{event.partition_key}</CopyableField></div>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <strong className="text-gray-700">UUID:</strong> 
+                      {event.uuid ? (
+                        <CopyableField value={event.uuid} className="font-mono text-xs bg-gray-50 px-2 py-1 rounded border">
+                          {event.uuid}
+                        </CopyableField>
+                      ) : (
+                        <span className="text-muted-foreground italic bg-red-50 px-2 py-1 rounded border border-red-200">
+                          No UUID provided
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <strong className="text-gray-700">Event Type:</strong> 
+                      <span className="ml-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                        {event.event_type}
+                      </span>
+                    </div>
+                    <div>
+                      <strong className="text-gray-700">Position:</strong> 
+                      <span className="ml-2 font-mono text-sm bg-gray-100 px-2 py-1 rounded">
+                        {event.position.toLocaleString()}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 
                 <div>
                   <h4 className="font-medium mb-3 flex items-center gap-2">
-                    <Database className="h-4 w-4" />
-                    Positioning
+                    <Layers className="h-4 w-4" />
+                    Tags
                   </h4>
-                  <div className="space-y-2 text-sm">
-                    <div><strong>Partition ID:</strong> {event.partition_id}</div>
-                    <div><strong>Partition Sequence:</strong> {event.partition_sequence}</div>
-                    <div><strong>Stream Version:</strong> {event.stream_version}</div>
-                    <div><strong>Timestamp:</strong> {formatTimestamp(event.timestamp)}</div>
+                  <div className="space-y-3 text-sm">
+                    {event.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {event.tags.map((tag, index) => (
+                          <CopyableField key={index} value={tag} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors">
+                            {tag}
+                          </CopyableField>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-muted-foreground italic bg-gray-50 p-3 rounded border-l-4 border-gray-300">
+                        No tags associated with this event
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
               
-              {(event.metadata || event.metadata_parsed) && (
-                <div>
-                  <h4 className="font-medium mb-3 flex items-center gap-2">
-                    <Layers className="h-4 w-4" />
-                    Metadata
-                  </h4>
-                  <JsonViewer 
-                    content={event.metadata} 
-                    encoding={event.metadata_encoding}
-                    parsed_data={event.metadata_parsed}
-                    title="metadata" 
-                  />
-                </div>
-              )}
-              
-              {(event.payload || event.payload_parsed) && (
+              {(event.data || event.data_parsed) && (
                 <div>
                   <h4 className="font-medium mb-3 flex items-center gap-2">
                     <FileText className="h-4 w-4" />
-                    Payload
+                    Event Data
                   </h4>
                   <JsonViewer 
-                    content={event.payload} 
-                    encoding={event.payload_encoding}
-                    parsed_data={event.payload_parsed}
-                    title="payload" 
+                    content={event.data} 
+                    encoding={event.data_encoding}
+                    parsed_data={event.data_parsed}
+                    title="data" 
                   />
                 </div>
               )}

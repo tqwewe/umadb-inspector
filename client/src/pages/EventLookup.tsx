@@ -51,8 +51,8 @@ export function EventLookup() {
   }
 
   const copyEventId = async () => {
-    if (event?.event_id) {
-      await navigator.clipboard.writeText(event.event_id)
+    if (event?.uuid) {
+      await navigator.clipboard.writeText(event.uuid)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
@@ -67,7 +67,7 @@ export function EventLookup() {
           Event Lookup
         </h1>
         <p className="text-muted-foreground mt-2">
-          Search for specific events by their unique identifier (UUID)
+          Search for specific events by their unique identifier (UUID) in the UmaDB event store
         </p>
       </div>
 
@@ -104,7 +104,7 @@ export function EventLookup() {
             
             <div>
               <p className="text-sm text-muted-foreground">
-                💡 Tip: You can find actual event IDs by browsing partitions or streams first
+                💡 Tip: You can find actual event UUIDs by browsing events by type or tags first
               </p>
             </div>
           </div>
@@ -175,18 +175,20 @@ export function EventLookup() {
                   variant="outline" 
                   asChild
                 >
-                  <a href={`/partitions/${event.partition_id}`}>
-                    View Partition {event.partition_id}
+                  <a href={`/event-types?type=${encodeURIComponent(event.event_type)}`}>
+                    View Event Type "{event.event_type}"
                   </a>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  asChild
-                >
-                  <a href={`/streams/${encodeURIComponent(event.stream_id)}?partitionKey=${encodeURIComponent(event.partition_key)}`}>
-                    View Stream "{event.stream_id}"
-                  </a>
-                </Button>
+                {event.tags.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    asChild
+                  >
+                    <a href={`/tags?tags=${encodeURIComponent(event.tags.join(','))}`}>
+                      View Events with Tags: {event.tags.join(', ')}
+                    </a>
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

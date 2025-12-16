@@ -1,24 +1,17 @@
 import { z } from 'zod';
-export const SierraDBEventSchema = z.object({
-    event_id: z.string(),
-    partition_key: z.string(),
-    partition_id: z.number(),
-    transaction_id: z.string(),
-    partition_sequence: z.number(),
-    stream_version: z.number(),
+export const UmaDBEventSchema = z.object({
+    uuid: z.string(),
+    event_type: z.string(),
+    tags: z.array(z.string()),
+    position: z.number(),
     timestamp: z.number(),
-    stream_id: z.string(),
-    event_name: z.string(),
-    metadata: z.string().nullable(),
-    payload: z.string().nullable(),
+    data: z.string().nullable(),
+    data_encoding: z.string().nullable(),
+    data_parsed: z.any().nullable(),
 });
-export const PartitionScanResponseSchema = z.object({
+export const EventReadResponseSchema = z.object({
     has_more: z.boolean(),
-    events: z.array(SierraDBEventSchema),
+    events: z.array(UmaDBEventSchema),
 });
-export const StreamScanResponseSchema = z.object({
-    has_more: z.boolean(),
-    events: z.array(SierraDBEventSchema),
-});
-export const EventGetResponseSchema = SierraDBEventSchema.nullable();
+export const EventGetResponseSchema = UmaDBEventSchema.nullable();
 export const PingResponseSchema = z.string();

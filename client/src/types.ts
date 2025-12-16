@@ -1,52 +1,32 @@
-export interface SierraDBEvent {
-  event_id: string
-  partition_key: string
-  partition_id: number
-  transaction_id: string
-  partition_sequence: number
-  stream_version: number
-  timestamp: number
-  stream_id: string
-  event_name: string
-  metadata: string | null
-  metadata_encoding?: 'base64-cbor' | 'base64-binary' | 'json' | null
-  metadata_parsed?: any
-  payload: string | null
-  payload_encoding?: 'base64-cbor' | 'base64-binary' | 'json' | null
-  payload_parsed?: any
+export interface UmaDBEvent {
+  uuid: string | null
+  event_type: string
+  tags: string[]
+  position: number
+  data: string | null
+  data_encoding?: 'base64-cbor' | 'base64-binary' | 'json' | null
+  data_parsed?: any
 }
 
-export interface PartitionScanResponse {
+export interface EventReadResponse {
   has_more: boolean
-  events: SierraDBEvent[]
+  events: UmaDBEvent[]
 }
 
-export interface StreamScanResponse {
-  has_more: boolean
-  events: SierraDBEvent[]
-}
-
-export type EventGetResponse = SierraDBEvent | null
+export type EventGetResponse = UmaDBEvent | null
 
 export type PingResponse = string
-
-export interface HelloResponse {
-  version: string
-  num_partitions: number
-  server: string
-  peer_id: string
-}
 
 export interface ProjectionRunRequest {
   code: string
   initialState?: any
-  streamId?: string
+  eventTypes?: string[]
+  tags?: string[]
 }
 
 export interface ProjectionProgress {
-  current_partition: number
-  total_partitions: number
   events_processed: number
+  total_events_estimated?: number
   current_state: any
   status: 'running' | 'completed' | 'error'
   error?: string
@@ -56,7 +36,8 @@ export interface ProjectionProgress {
 export interface DebugSessionStartRequest {
   code: string
   initialState?: any
-  streamId?: string
+  eventTypes?: string[]
+  tags?: string[]
 }
 
 export interface DebugStepRequest {
@@ -96,7 +77,8 @@ export interface SavedProjection {
   description?: string
   createdAt: string // ISO date string for localStorage compatibility
   updatedAt: string
-  streamId?: string // for stream-specific projections
+  eventTypes?: string[] // for event type filtering
+  tags?: string[] // for tag filtering
   renderMode: 'json' | 'html' // how to display results
   htmlTemplate?: string // optional custom HTML template
   category?: string // for organization

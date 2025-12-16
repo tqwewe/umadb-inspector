@@ -1,4 +1,4 @@
-import { SierraDBEvent } from '../types.js'
+import { UmaDBEvent } from '../types.js'
 import { 
   Table,
   TableBody,
@@ -11,7 +11,7 @@ import { EventTableRow } from './EventTableRow'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface EventTableProps {
-  events: SierraDBEvent[]
+  events: UmaDBEvent[]
   hasMore?: boolean
   canLoadPrevious?: boolean
   onLoadNext?: () => void
@@ -36,18 +36,15 @@ export function EventTable({ events, hasMore, canLoadPrevious, onLoadNext, onLoa
           <TableHeader>
             <TableRow>
               <TableHead className="w-[30px]"></TableHead>
-              <TableHead>Event Name</TableHead>
-              <TableHead>Event ID</TableHead>
-              <TableHead>Stream ID</TableHead>
-              <TableHead className="w-[80px]">Partition</TableHead>
-              <TableHead className="w-[80px]">Sequence</TableHead>
-              <TableHead className="w-[80px]">Version</TableHead>
-              <TableHead className="w-[200px]">Timestamp</TableHead>
+              <TableHead className="w-[200px]">Event Type</TableHead>
+              <TableHead className="w-[320px] min-w-[320px]">UUID</TableHead>
+              <TableHead className="w-[100px] text-center">Position</TableHead>
+              <TableHead>Tags</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {events.map((event) => (
-              <EventTableRow key={event.event_id} event={event} />
+            {events.map((event, index) => (
+              <EventTableRow key={event.uuid || `event-${event.position}-${index}`} event={event} />
             ))}
           </TableBody>
         </Table>
