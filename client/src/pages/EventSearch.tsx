@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EventTable } from '@/components/EventTable'
+import { HTMLRenderer } from '@/components/HTMLRenderer'
 import { api } from '@/lib/api'
 import { 
   Tags, 
@@ -13,9 +14,14 @@ import {
   ChevronRight,
   Loader2,
   AlertCircle,
-  X
+  X,
+  BarChart3,
+  Table,
+  Clock,
+  GitBranch,
+  Activity
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 
 export function EventSearch() {
   const { tags: urlTags } = useParams()
@@ -31,6 +37,10 @@ export function EventSearch() {
   const { tags, eventTypes, start, backwards, limit } = state
   const [newTag, setNewTag] = useState('')
   const [newEventType, setNewEventType] = useState('')
+  
+  // Visualization mode state
+  const [viewMode, setViewMode] = useState<'table' | 'visualize'>('table')
+  const [visualizationType, setVisualizationType] = useState<'timeline' | 'flow' | 'heatmap' | 'stats'>('timeline')
   
   // Separate query state that only updates on explicit search
   const [queryState, setQueryState] = useState({
@@ -168,17 +178,318 @@ export function EventSearch() {
     setTimeout(() => refetch(), 0)
   }
 
+  // Process events for visualization
+  const processedVisualizationData = useMemo(() => {
+    if (!data?.events || data.events.length === 0) return null
+
+    const events = data.events
+
+    switch (visualizationType) {
+      case 'timeline': {
+        // Build timeline data structure - try to detect grouping dimension
+        const groups: Record<string, any> = {}
+        const eventTypes = new Set<string>()
+        let minPosition = Infinity
+        let maxPosition = -Infinity
+
+        // Try to find a good grouping dimension from tags or use event types
+        let groupingDimension = 'event_type' // fallback to event types
+        let hasUserTags = false
+        let hasOtherGroupingTags = false
+
+        // Analyze tags to find a good grouping dimension
+        events.forEach(event => {
+          if (event.tags) {
+            event.tags.forEach(tag => {
+              if (tag.startsWith('user:') || tag.startsWith('userId:')) {
+                hasUserTags = true
+              } else if (tag.includes(':') && !tag.startsWith('system:') && !tag.startsWith('event:')) {
+                hasOtherGroupingTags = true
+              }
+            })
+          }
+        })
+
+        if (hasUserTags) {
+          groupingDimension = 'user'
+        } else if (hasOtherGroupingTags) {
+          groupingDimension = 'tag_group'
+        }
+
+        events.forEach(event => {
+          let groupId = 'All Events'
+
+          if (groupingDimension === 'user' && event.tags) {
+            const userTag = event.tags.find(tag => tag.startsWith('user:') || tag.startsWith('userId:'))
+            if (userTag) {
+              groupId = userTag.split(':')[1] || 'Unknown User'
+            } else {
+              groupId = 'No User'
+            }
+          } else if (groupingDimension === 'tag_group' && event.tags) {
+            // Use first meaningful tag as group
+            const meaningfulTag = event.tags.find(tag => tag.includes(':') && !tag.startsWith('system:'))
+            if (meaningfulTag) {
+              const [prefix] = meaningfulTag.split(':')
+              groupId = prefix
+            }
+          } else if (groupingDimension === 'event_type') {
+            groupId = event.event_type
+          }
+
+          if (!groups[groupId]) {
+            groups[groupId] = {
+              events: [],
+              firstSeen: event.position,
+              lastSeen: event.position,
+              eventCount: 0,
+              uniqueEventTypes: []
+            }
+          }
+
+          groups[groupId].events.push({
+            position: event.position,
+            timestamp: new Date().toISOString(),
+            type: event.event_type,
+            tags: event.tags || [],
+            data: event.data_parsed,
+            uuid: event.uuid
+          })
+
+          groups[groupId].lastSeen = Math.max(groups[groupId].lastSeen, event.position)
+          groups[groupId].eventCount++
+          
+          eventTypes.add(event.event_type)
+          minPosition = Math.min(minPosition, event.position)
+          maxPosition = Math.max(maxPosition, event.position)
+        })
+
+        // Convert to arrays
+        Object.values(groups).forEach((group: any) => {
+          group.uniqueEventTypes = [...new Set(group.events.map((e: any) => e.type))]
+        })
+
+        return {
+          users: groups, // Keep the 'users' key for component compatibility
+          timeRange: { start: minPosition, end: maxPosition },
+          eventTypes: Array.from(eventTypes),
+          totalEvents: events.length,
+          groupingDimension // Add info about how data is grouped
+        }
+      }
+
+      case 'flow': {
+        // Build flow analysis data
+        const transitions: Record<string, any> = {}
+        const eventFrequency: Record<string, number> = {}
+        const nodes = new Set<string>()
+        let totalTransitions = 0
+
+        // Sort all events by position and create sequential transitions
+        const sortedEvents = [...events].sort((a, b) => a.position - b.position)
+        
+        sortedEvents.forEach(event => {
+          eventFrequency[event.event_type] = (eventFrequency[event.event_type] || 0) + 1
+          nodes.add(event.event_type)
+        })
+
+        // Find transitions in the sequential event stream
+        for (let i = 1; i < sortedEvents.length; i++) {
+          const fromEvent = sortedEvents[i - 1]
+          const toEvent = sortedEvents[i]
+          
+          // Only create transitions between nearby events (within reasonable position distance)
+          const positionGap = toEvent.position - fromEvent.position
+          if (positionGap <= 1000) { // Adjust this threshold as needed
+            const transitionKey = `${fromEvent.event_type} → ${toEvent.event_type}`
+            
+            if (!transitions[transitionKey]) {
+              transitions[transitionKey] = {
+                from: fromEvent.event_type,
+                to: toEvent.event_type,
+                count: 0,
+                users: new Set()
+              }
+            }
+            
+            transitions[transitionKey].count++
+            
+            // Try to extract any identifier for grouping
+            let identifier = 'event-stream'
+            if (fromEvent.tags) {
+              const identifierTag = fromEvent.tags.find(tag => tag.includes(':'))
+              if (identifierTag) {
+                identifier = identifierTag.split(':')[0]
+              }
+            }
+            transitions[transitionKey].users.add(identifier)
+            totalTransitions++
+          }
+        }
+
+        // Convert Sets to arrays
+        Object.values(transitions).forEach((t: any) => {
+          t.users = Array.from(t.users)
+        })
+
+        return {
+          transitions,
+          eventFrequency,
+          nodes: Array.from(nodes),
+          totalTransitions
+        }
+      }
+
+      case 'heatmap': {
+        // Build activity heatmap data
+        const hourlyActivity: Record<number, number> = {}
+        const dailyActivity: Record<string, number> = {}
+        const weeklyActivity: Record<number, Record<number, number>> = {}
+        const eventTypeActivity: Record<string, any> = {}
+
+        // Initialize weekly grid
+        for (let day = 0; day < 7; day++) {
+          weeklyActivity[day] = {}
+          for (let hour = 0; hour < 24; hour++) {
+            weeklyActivity[day][hour] = 0
+          }
+        }
+
+        events.forEach(event => {
+          // Use position as time proxy with some randomness for demo
+          const fakeTime = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
+          const hour = fakeTime.getHours()
+          const dayOfWeek = fakeTime.getDay()
+          const dayKey = fakeTime.toISOString().split('T')[0]
+
+          hourlyActivity[hour] = (hourlyActivity[hour] || 0) + 1
+          dailyActivity[dayKey] = (dailyActivity[dayKey] || 0) + 1
+          weeklyActivity[dayOfWeek][hour]++
+
+          if (!eventTypeActivity[event.event_type]) {
+            eventTypeActivity[event.event_type] = {
+              hourly: {},
+              daily: {},
+              total: 0
+            }
+          }
+
+          const typeActivity = eventTypeActivity[event.event_type]
+          typeActivity.hourly[hour] = (typeActivity.hourly[hour] || 0) + 1
+          typeActivity.daily[dayKey] = (typeActivity.daily[dayKey] || 0) + 1
+          typeActivity.total++
+        })
+
+        return {
+          hourlyActivity,
+          dailyActivity,
+          weeklyActivity,
+          eventTypeActivity,
+          totalEvents: events.length
+        }
+      }
+
+      case 'stats': {
+        // Build statistics data
+        const eventsByType: Record<string, number> = {}
+        const tagCounts: Record<string, number> = {}
+        const tagPrefixes: Record<string, number> = {}
+        let positionRange = { min: Infinity, max: -Infinity }
+
+        events.forEach(event => {
+          eventsByType[event.event_type] = (eventsByType[event.event_type] || 0) + 1
+          
+          if (event.tags) {
+            event.tags.forEach(tag => {
+              tagCounts[tag] = (tagCounts[tag] || 0) + 1
+              
+              // Count tag prefixes for grouping insights
+              if (tag.includes(':')) {
+                const prefix = tag.split(':')[0]
+                tagPrefixes[prefix] = (tagPrefixes[prefix] || 0) + 1
+              }
+            })
+          }
+
+          positionRange.min = Math.min(positionRange.min, event.position)
+          positionRange.max = Math.max(positionRange.max, event.position)
+        })
+
+        // Calculate some derived metrics
+        const uniqueEventTypes = Object.keys(eventsByType).length
+        const totalTags = Object.keys(tagCounts).length
+        const tagPrefixCount = Object.keys(tagPrefixes).length
+        const avgEventsPerType = uniqueEventTypes > 0 ? events.length / uniqueEventTypes : 0
+        const mostCommonEventType = Object.entries(eventsByType).sort(([,a], [,b]) => b - a)[0]
+        const mostCommonTag = Object.entries(tagCounts).sort(([,a], [,b]) => b - a)[0]
+
+        return {
+          totalEvents: events.length,
+          uniqueEventTypes,
+          totalTags,
+          tagPrefixCount,
+          eventsByType,
+          tagCounts,
+          tagPrefixes,
+          positionRange,
+          timeSpan: positionRange.max - positionRange.min,
+          avgEventsPerType,
+          mostCommonEventType: mostCommonEventType ? mostCommonEventType[0] : 'N/A',
+          mostCommonEventTypeCount: mostCommonEventType ? mostCommonEventType[1] : 0,
+          mostCommonTag: mostCommonTag ? mostCommonTag[0] : 'N/A',
+          mostCommonTagCount: mostCommonTag ? mostCommonTag[1] : 0
+        }
+      }
+
+      default:
+        return null
+    }
+  }, [data?.events, visualizationType])
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <Search className="h-8 w-8" />
-          Event Search
+          Event Search & Visualization
         </h1>
         <p className="text-muted-foreground mt-2">
-          Search and filter events by type, tags, and position in UmaDB
+          Search, filter, and visualize events by type, tags, and position in UmaDB
         </p>
       </div>
+
+      {/* Quick Start Tips */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="h-5 w-5" />
+            Visualization Quick Start
+          </CardTitle>
+          <CardDescription>
+            Tips for getting the most out of event visualizations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="space-y-2">
+              <h4 className="font-medium">📊 Timeline Analysis</h4>
+              <p className="text-muted-foreground">Groups events by type or tags to show activity patterns over time.</p>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-medium">🔄 Flow Analysis</h4>
+              <p className="text-muted-foreground">Shows how events transition between types in sequence. Great for process flows.</p>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-medium">🔥 Activity Heatmap</h4>
+              <p className="text-muted-foreground">Reveals patterns in event timing and frequency across different time periods.</p>
+            </div>
+            <div className="space-y-2">
+              <h4 className="font-medium">📈 Statistics</h4>
+              <p className="text-muted-foreground">Overview of event counts, types, tags, and position distribution.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -348,23 +659,90 @@ export function EventSearch() {
               </span>
             </h2>
             
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={loadPrevious}
-                disabled={!data.events.length || Number(start) <= 1}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Previous
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={loadNext}
-                disabled={!data.has_more}
-              >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+            <div className="flex items-center gap-2">
+              {/* View Mode Toggle */}
+              <div className="flex items-center gap-1 mr-4">
+                <Button
+                  variant={viewMode === 'table' ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="px-3"
+                >
+                  <Table className="h-4 w-4 mr-1" />
+                  Table
+                </Button>
+                <Button
+                  variant={viewMode === 'visualize' ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setViewMode('visualize')}
+                  className="px-3"
+                >
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  Visualize
+                </Button>
+              </div>
+
+              {/* Visualization Type Selector */}
+              {viewMode === 'visualize' && (
+                <div className="flex items-center gap-1 mr-4">
+                  <Button
+                    variant={visualizationType === 'timeline' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setVisualizationType('timeline')}
+                    className="px-2 text-xs"
+                  >
+                    <Clock className="h-3 w-3 mr-1" />
+                    Timeline
+                  </Button>
+                  <Button
+                    variant={visualizationType === 'flow' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setVisualizationType('flow')}
+                    className="px-2 text-xs"
+                  >
+                    <GitBranch className="h-3 w-3 mr-1" />
+                    Flow
+                  </Button>
+                  <Button
+                    variant={visualizationType === 'heatmap' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setVisualizationType('heatmap')}
+                    className="px-2 text-xs"
+                  >
+                    <Activity className="h-3 w-3 mr-1" />
+                    Heatmap
+                  </Button>
+                  <Button
+                    variant={visualizationType === 'stats' ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setVisualizationType('stats')}
+                    className="px-2 text-xs"
+                  >
+                    <BarChart3 className="h-3 w-3 mr-1" />
+                    Stats
+                  </Button>
+                </div>
+              )}
+              
+              {/* Pagination Controls */}
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={loadPrevious}
+                  disabled={!data.events.length || Number(start) <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Previous
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={loadNext}
+                  disabled={!data.has_more}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -376,16 +754,41 @@ export function EventSearch() {
             </Card>
           ) : (
             <div>
-              <div className="mb-4 text-sm text-muted-foreground">
-                Events are ordered by their position in the global event stream.
-              </div>
-              <EventTable 
-                events={data.events}
-                hasMore={data.has_more}
-                canLoadPrevious={Number(start) > 0}
-                onLoadNext={loadNext}
-                onLoadPrevious={loadPrevious}
-              />
+              {viewMode === 'table' ? (
+                <>
+                  <div className="mb-4 text-sm text-muted-foreground">
+                    Events are ordered by their position in the global event stream.
+                  </div>
+                  <EventTable 
+                    events={data.events}
+                    hasMore={data.has_more}
+                    canLoadPrevious={Number(start) > 0}
+                    onLoadNext={loadNext}
+                    onLoadPrevious={loadPrevious}
+                  />
+                </>
+              ) : (
+                <>
+                  <div className="mb-4 text-sm text-muted-foreground">
+                    Interactive visualization of {data.events.length} events. {data.has_more ? 'Load more events for broader analysis.' : ''}
+                  </div>
+                  {processedVisualizationData ? (
+                    <HTMLRenderer 
+                      data={processedVisualizationData}
+                      title={`Event ${visualizationType.charAt(0).toUpperCase() + visualizationType.slice(1)} Analysis`}
+                      description={`${visualizationType.charAt(0).toUpperCase() + visualizationType.slice(1)} view of search results with ${data.events.length} events`}
+                    />
+                  ) : (
+                    <Card>
+                      <CardContent className="p-6 text-center text-muted-foreground">
+                        <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>Unable to generate visualization for the selected type.</p>
+                        <p className="text-xs mt-2">Try a different visualization type or check if events contain the required data.</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>

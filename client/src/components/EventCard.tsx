@@ -1,4 +1,4 @@
-import { SierraDBEvent } from '../types.js'
+import { UmaDBEvent } from '../types.js'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { JsonViewer } from '@/components/JsonViewer'
 import { 
@@ -44,7 +44,7 @@ function CopyableField({ value, children, className = "" }: CopyableFieldProps) 
 }
 
 interface EventCardProps {
-  event: SierraDBEvent
+  event: UmaDBEvent
 }
 
 export function EventCard({ event }: EventCardProps) {

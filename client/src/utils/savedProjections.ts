@@ -1,8 +1,8 @@
 import { SavedProjection, SavedProjectionResult } from '../types.js'
 
 const STORAGE_KEYS = {
-  PROJECTIONS: 'sierradb-saved-projections',
-  RESULTS: 'sierradb-projection-results'
+  PROJECTIONS: 'umadb-saved-projections',
+  RESULTS: 'umadb-projection-results'
 } as const
 
 // Utility functions for localStorage operations

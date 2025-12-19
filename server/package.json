@@ -1,5 +1,5 @@
 {
-  "name": "@sierradb-inspector/server",
+  "name": "@umadb-inspector/server",
   "version": "0.1.0",
   "type": "module",
   "scripts": {

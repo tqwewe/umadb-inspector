@@ -1,7 +1,7 @@
 {
-  "name": "sierradb-inspector",
+  "name": "umadb-inspector",
   "version": "0.1.0",
-  "description": "Web interface for exploring events in SierraDB",
+  "description": "Web interface for exploring events in UmaDB",
   "scripts": {
     "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
     "client:dev": "cd client && npm run dev",

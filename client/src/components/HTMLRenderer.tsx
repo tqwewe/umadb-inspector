@@ -4,6 +4,9 @@ import { Badge } from '@/components/ui/badge'
 import { Search } from '@/components/ui/search'
 import { Pagination } from '@/components/ui/pagination'
 import { JsonViewer } from '@/components/JsonViewer'
+import { TimelineChart } from '@/components/visualizations/TimelineChart'
+import { EventFlowDiagram } from '@/components/visualizations/EventFlowDiagram'
+import { ActivityHeatmap } from '@/components/visualizations/ActivityHeatmap'
 import { HTMLRenderConfig, RenderTemplate } from '../types.js'
 import { 
   TrendingUp,
@@ -40,6 +43,44 @@ function hasListableStructure(data: any): boolean {
   
   const firstItem = data[0]
   return 'title' in firstItem || 'name' in firstItem || 'id' in firstItem
+}
+
+// Visualization type detection functions
+function isTimelineData(data: any): boolean {
+  if (typeof data !== 'object' || data === null) return false
+  
+  return (
+    'users' in data &&
+    'timeRange' in data &&
+    'eventTypes' in data &&
+    typeof data.users === 'object' &&
+    typeof data.timeRange === 'object' &&
+    Array.isArray(data.eventTypes)
+  )
+}
+
+function isFlowData(data: any): boolean {
+  if (typeof data !== 'object' || data === null) return false
+  
+  return (
+    'transitions' in data &&
+    'nodes' in data &&
+    'totalTransitions' in data &&
+    typeof data.transitions === 'object' &&
+    Array.isArray(data.nodes)
+  )
+}
+
+function isHeatmapData(data: any): boolean {
+  if (typeof data !== 'object' || data === null) return false
+  
+  return (
+    'hourlyActivity' in data &&
+    'weeklyActivity' in data &&
+    'totalEvents' in data &&
+    typeof data.hourlyActivity === 'object' &&
+    typeof data.weeklyActivity === 'object'
+  )
 }
 
 // Smart detection for nested collections
@@ -115,7 +156,13 @@ function extractMainCollection(data: any): { collection: any[]; meta: any; colle
 }
 
 // Auto-detect the best template for the data
-function detectTemplate(data: any): RenderTemplate {
+function detectTemplate(data: any): RenderTemplate | 'timeline' | 'flow' | 'heatmap' {
+  // First check for visualization data types
+  if (isTimelineData(data)) return 'timeline'
+  if (isFlowData(data)) return 'flow'  
+  if (isHeatmapData(data)) return 'heatmap'
+  
+  // Then check for standard templates
   if (hasListableStructure(data)) return 'list'
   if (isObjectWithNumericValues(data)) return 'stats'
   if (isArrayOfObjects(data)) return 'table'
@@ -754,6 +801,27 @@ export function HTMLRenderer({ data, config, title, description }: HTMLRendererP
   }
 
   switch (template) {
+    case 'timeline':
+      return isTimelineData(data) ? (
+        <TimelineChart data={data} title={displayTitle} description={displayDescription} />
+      ) : (
+        <AutoTemplate data={data} title={displayTitle} description={displayDescription} />
+      )
+
+    case 'flow':
+      return isFlowData(data) ? (
+        <EventFlowDiagram data={data} title={displayTitle} description={displayDescription} />
+      ) : (
+        <AutoTemplate data={data} title={displayTitle} description={displayDescription} />
+      )
+
+    case 'heatmap':
+      return isHeatmapData(data) ? (
+        <ActivityHeatmap data={data} title={displayTitle} description={displayDescription} />
+      ) : (
+        <AutoTemplate data={data} title={displayTitle} description={displayDescription} />
+      )
+
     case 'list':
       return isArrayOfObjects(data) && hasListableStructure(data) ? (
         <ListTemplate data={data} title={displayTitle} description={displayDescription} />

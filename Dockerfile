@@ -1,4 +1,4 @@
-# Multi-stage build for SierraDB Inspector
+# Multi-stage build for UmaDB Inspector
 FROM node:22-alpine AS builder
 
 # Install Python and build dependencies needed for native modules
@@ -68,7 +68,7 @@ EXPOSE 3001
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=3001
-ENV SIERRADB_URL=redis://localhost:9090
+ENV UMADB_URL=localhost:50051
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

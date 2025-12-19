@@ -57,7 +57,7 @@ export interface DebugSessionStatus {
   currentEventIndex: number
   totalEventsLoaded: number
   currentState: any
-  currentEvent: SierraDBEvent | null
+  currentEvent: UmaDBEvent | null
   previousState: any | null
   consoleLogs: ConsoleLog[]
   error?: string

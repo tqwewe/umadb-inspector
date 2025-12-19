@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { JsonViewer } from '@/components/JsonViewer'
+import { HTMLRenderer } from '@/components/HTMLRenderer'
 import { useSavedProjections } from '@/hooks/useSavedProjections'
+import { visualizationTemplates } from '@/utils/visualizationTemplates'
 import { 
   Calculator, 
   Play, 
@@ -17,7 +19,9 @@ import {
   StepForward,
   RotateCcw,
   Save,
-  X
+  X,
+  BarChart3,
+  Code
 } from 'lucide-react'
 import { ProjectionProgress, ProjectionRunRequest, DebugSessionStatus } from '../types.js'
 import { api } from '@/lib/api'
@@ -94,6 +98,10 @@ export function ProjectionRunner() {
   const [debugSession, setDebugSession] = useState<DebugSessionStatus | null>(null)
   const [isDebugging, setIsDebugging] = useState(false)
   const [debugSessionId, setDebugSessionId] = useState<string | null>(null)
+  
+  // Visualization mode state
+  const [visualizationMode, setVisualizationMode] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null)
   
   // Filter state
   const [eventTypes, setEventTypes] = useState<string[]>(editingProjection?.eventTypes || [])
@@ -317,6 +325,16 @@ export function ProjectionRunner() {
     setTags(tags.filter(t => t !== tag))
   }
 
+  // Load visualization template
+  const loadTemplate = (templateId: string) => {
+    const template = visualizationTemplates.find(t => t.id === templateId)
+    if (template) {
+      setCode(template.code)
+      setSelectedTemplate(templateId)
+      setVisualizationMode(true)
+    }
+  }
+
   // Debug mode functions
   const startDebugSession = async () => {
     if (isDebugging || !code.trim()) return
@@ -431,6 +449,23 @@ export function ProjectionRunner() {
               <Save className="h-4 w-4 mr-2" />
               {editingProjection ? 'Update' : 'Save'} Projection
             </Button>
+            
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <label className="text-sm font-medium">Visualization Mode</label>
+              <input
+                type="checkbox"
+                checked={visualizationMode}
+                onChange={(e) => {
+                  setVisualizationMode(e.target.checked)
+                  if (!e.target.checked) {
+                    setSelectedTemplate(null)
+                  }
+                }}
+                className="w-4 h-4"
+              />
+            </div>
+            
             <div className="flex items-center gap-2">
               <Bug className="h-4 w-4" />
               <label className="text-sm font-medium">Debug Mode</label>
@@ -460,6 +495,48 @@ export function ProjectionRunner() {
       </div>
       
       <div className="flex-1 min-h-0 p-6 pt-6">
+        {/* Visualization Template Selector */}
+        {visualizationMode && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Visualization Templates</CardTitle>
+              <CardDescription>
+                Choose a pre-built visualization template or keep your custom code
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {visualizationTemplates.map((template) => (
+                  <Card 
+                    key={template.id} 
+                    className={`cursor-pointer transition-colors ${
+                      selectedTemplate === template.id 
+                        ? 'ring-2 ring-blue-500 bg-blue-50' 
+                        : 'hover:bg-muted/50'
+                    }`}
+                    onClick={() => loadTemplate(template.id)}
+                  >
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">{template.name}</CardTitle>
+                      <div className="flex gap-2 text-xs">
+                        <span className="px-2 py-1 bg-primary text-primary-foreground rounded">
+                          {template.visualizationType}
+                        </span>
+                        <span className="px-2 py-1 bg-muted text-muted-foreground rounded">
+                          {template.category.replace('-', ' ')}
+                        </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <p className="text-sm text-muted-foreground">{template.description}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Event Filters Section */}
         <Card className="mb-6">
           <CardHeader>
@@ -817,12 +894,56 @@ export function ProjectionRunner() {
                     {/* Current State */}
                     {progress.current_state && (
                       <div>
-                        <h4 className="font-medium mb-2">Current Projection State</h4>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium">Current Projection State</h4>
+                          <div className="flex items-center gap-2">
+                            {visualizationMode && (
+                              <div className="flex items-center gap-2 text-xs">
+                                <BarChart3 className="h-3 w-3" />
+                                <span>Visualization Mode</span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant={visualizationMode ? "outline" : "default"}
+                                size="sm"
+                                onClick={() => setVisualizationMode(false)}
+                                className="h-6 px-2 text-xs"
+                              >
+                                <Code className="h-3 w-3 mr-1" />
+                                JSON
+                              </Button>
+                              <Button
+                                variant={visualizationMode ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setVisualizationMode(true)}
+                                className="h-6 px-2 text-xs"
+                              >
+                                <BarChart3 className="h-3 w-3 mr-1" />
+                                Chart
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
                         <div className="border rounded-lg p-2 max-h-[40rem] overflow-auto">
-                          <JsonViewer 
-                            content={JSON.stringify(progress.current_state, null, 2)} 
-                            title="projection-state"
-                          />
+                          {visualizationMode ? (
+                            <HTMLRenderer 
+                              data={progress.current_state}
+                              title={selectedTemplate ? 
+                                visualizationTemplates.find(t => t.id === selectedTemplate)?.name :
+                                'Projection Visualization'
+                              }
+                              description={selectedTemplate ?
+                                visualizationTemplates.find(t => t.id === selectedTemplate)?.description :
+                                'Interactive visualization of projection results'
+                              }
+                            />
+                          ) : (
+                            <JsonViewer 
+                              content={JSON.stringify(progress.current_state, null, 2)} 
+                              title="projection-state"
+                            />
+                          )}
                         </div>
                       </div>
                     )}

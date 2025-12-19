@@ -3,7 +3,7 @@
 }:
 
 pkgs.stdenv.mkDerivation {
-  pname = "sierradb-inspector";
+  pname = "umadb-inspector";
   version = "1.0.0";
 
   src = ./.;
@@ -38,41 +38,41 @@ pkgs.stdenv.mkDerivation {
   installPhase = ''
         runHook preInstall
         
-        mkdir -p $out/lib/sierradb-inspector
+        mkdir -p $out/lib/umadb-inspector
         mkdir -p $out/bin
         
         # Copy server build output
-        cp -r server/dist $out/lib/sierradb-inspector/
-        cp -r server/node_modules $out/lib/sierradb-inspector/
-        cp server/package.json $out/lib/sierradb-inspector/
+        cp -r server/dist $out/lib/umadb-inspector/
+        cp -r server/node_modules $out/lib/umadb-inspector/
+        cp server/package.json $out/lib/umadb-inspector/
         
         # Copy client build output to be served by server
-        cp -r client/dist $out/lib/sierradb-inspector/public
+        cp -r client/dist $out/lib/umadb-inspector/public
         
         # Copy shared package
-        cp -r shared/dist $out/lib/sierradb-inspector/shared
+        cp -r shared/dist $out/lib/umadb-inspector/shared
         
         # Create startup script
-        cat > $out/bin/sierradb-inspector << EOF
+        cat > $out/bin/umadb-inspector << EOF
     #!/bin/sh
-    cd $out/lib/sierradb-inspector
-    export NODE_PATH=$out/lib/sierradb-inspector/node_modules
+    cd $out/lib/umadb-inspector
+    export NODE_PATH=$out/lib/umadb-inspector/node_modules
     export PORT=\''${PORT:-3001}
-    export SIERRADB_URL=\''${SIERRADB_URL:-redis://localhost:9090}
+    export UMADB_URL=\''${UMADB_URL:-localhost:50051}
     exec ${pkgs.nodejs}/bin/node dist/index.js "\$@"
     EOF
         
-        chmod +x $out/bin/sierradb-inspector
+        chmod +x $out/bin/umadb-inspector
         
         runHook postInstall
   '';
 
   meta = with pkgs.lib; {
-    description = "Web interface for exploring events in SierraDB";
-    homepage = "https://github.com/tqwewe/sierradb-inspector";
+    description = "Web interface for exploring events in UmaDB";
+    homepage = "https://github.com/tqwewe/umadb-inspector";
     license = licenses.mit; # Adjust if different
     maintainers = [ ];
     platforms = platforms.all;
-    mainProgram = "sierradb-inspector";
+    mainProgram = "umadb-inspector";
   };
 }

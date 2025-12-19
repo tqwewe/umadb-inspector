@@ -1,14 +1,14 @@
-# SierraDB Inspector
+# UmaDB Inspector
 
-A modern web interface for exploring events in SierraDB - a distributed event sourcing database built in Rust.
+A modern web interface for exploring events in UmaDB - a distributed event sourcing database built in Rust.
 
 ## Features
 
-- **Partition Explorer** - Browse events across SierraDB's 1,024 logical partitions
-- **Stream Explorer** - Navigate event streams by version numbers
+- **Event Search** - Search and filter events by type, tags, and position  
+- **Interactive Visualizations** - Timeline, flow analysis, heatmaps, and statistics
 - **Event Lookup** - Search for specific events by UUID
 - **Projection Runner** - Execute JavaScript projections against event data
-- **Real-time Connection Status** - Monitor SierraDB connectivity
+- **Real-time Connection Status** - Monitor UmaDB connectivity
 - **Responsive Design** - Modern UI built with React and Tailwind CSS
 
 ## Screenshots
@@ -30,20 +30,20 @@ Execute custom JavaScript projections to analyze event data:
 This is a monorepo containing:
 
 - **`client/`** - React frontend with TypeScript, Vite, and Tailwind CSS
-- **`server/`** - Express.js backend with Redis client for SierraDB RESP3 protocol
+- **`server/`** - Express.js backend with gRPC client for UmaDB protocol
 - **`shared/`** - Common TypeScript types and utilities
 
 ## Prerequisites
 
 - Node.js 18+ 
-- SierraDB instance running on Redis protocol (default: `redis://localhost:9090`)
+- UmaDB instance running on gRPC protocol (default: `localhost:50051`)
 
 ## Quick Start
 
 ### Option 1: Using Docker (Recommended)
 
 ```bash
-docker run -p 3001:3001 -e SIERRADB_URL=redis://your-sierradb-host:9090 tqwewe/sierradb-inspector
+docker run -p 3001:3001 -e UMADB_URL=your-umadb-host:50051 tqwewe/umadb-inspector
 ```
 
 Access the application at http://localhost:3001
@@ -67,27 +67,27 @@ Access the application at http://localhost:3001
 
 ## Environment Configuration
 
-Create a `.env` file in the server directory to configure SierraDB connection:
+Create a `.env` file in the server directory to configure UmaDB connection:
 
 ```env
-SIERRADB_URL=redis://localhost:9090
+UMADB_URL=localhost:50051
 PORT=3001
 ```
 
-## SierraDB Overview
+## UmaDB Overview
 
-SierraDB organizes data around:
-- **1,024 logical partitions** for deterministic hashing and concurrency control
-- **Streams** with monotonic, gapless version numbers
-- **Events** with unique UUIDs and partition sequences
-- **RESP3 protocol** for communication
+UmaDB organizes data around:
+- **Single global event stream** with position-based ordering
+- **Event types and tags** for flexible categorization and filtering  
+- **Events** with unique UUIDs and sequential positions
+- **gRPC protocol** for communication
 
 ## API Endpoints
 
-- `GET /api/ping` - Test SierraDB connectivity
+- `GET /api/ping` - Test UmaDB connectivity
 - `GET /api/events/:event_id` - Get event by UUID
-- `GET /api/partitions/:partition/scan` - Scan partition events
-- `GET /api/streams/:stream_id/scan` - Scan stream events
+- `GET /api/events/search` - Search events by filters
+- `GET /api/events/scan` - Scan events by position range
 
 ## Development
 
@@ -107,4 +107,4 @@ npm start
 
 ## License
 
-This project is built for exploring SierraDB event data in a simple and intuitive way.
+This project is built for exploring UmaDB event data in a simple and intuitive way.
