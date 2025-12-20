@@ -7,9 +7,13 @@ import {
   FileText, 
   Database,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  GitBranch,
+  ArrowRight
 } from 'lucide-react'
 import { useState } from 'react'
+import { parseStoredEventData, formatEventTimestamp, getRelativeTime, truncateUuid } from '@/utils/storedEventData'
 
 interface CopyableFieldProps {
   value: string
@@ -45,6 +49,7 @@ function CopyableField({ value, children, className = "" }: CopyableFieldProps) 
 
 interface EventCardProps {
   event: UmaDBEvent
+  onTriggeredByClick?: (eventId: string) => void
 }
 
 export function EventCard({ event }: EventCardProps) {

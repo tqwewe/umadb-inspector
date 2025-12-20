@@ -163,7 +163,12 @@ export function EventLookup() {
             </Button>
           </div>
           
-          <EventTable events={[event]} />
+          <EventTable 
+            events={[event]} 
+            onEventNavigate={(eventId) => {
+              updateState({ eventId })
+            }}
+          />
           
           <Card>
             <CardHeader>
@@ -175,7 +180,7 @@ export function EventLookup() {
                   variant="outline" 
                   asChild
                 >
-                  <a href={`/event-types?type=${encodeURIComponent(event.event_type)}`}>
+                  <a href={`/search?eventTypes=${encodeURIComponent(event.event_type)}`}>
                     View Event Type "{event.event_type}"
                   </a>
                 </Button>
@@ -184,7 +189,7 @@ export function EventLookup() {
                     variant="outline" 
                     asChild
                   >
-                    <a href={`/tags?tags=${encodeURIComponent(event.tags.join(','))}`}>
+                    <a href={`/search?tags=${encodeURIComponent(event.tags.join(','))}`}>
                       View Events with Tags: {event.tags.join(', ')}
                     </a>
                   </Button>

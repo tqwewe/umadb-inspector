@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useURLState } from '@/hooks/useURLState'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +25,7 @@ import { useState, useMemo } from 'react'
 
 export function EventSearch() {
   const { tags: urlTags } = useParams()
+  const navigate = useNavigate()
   
   const [state, updateState] = useURLState({
     tags: urlTags || '',
@@ -458,38 +459,6 @@ export function EventSearch() {
         </p>
       </div>
 
-      {/* Quick Start Tips */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
-            Visualization Quick Start
-          </CardTitle>
-          <CardDescription>
-            Tips for getting the most out of event visualizations
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div className="space-y-2">
-              <h4 className="font-medium">📊 Timeline Analysis</h4>
-              <p className="text-muted-foreground">Groups events by type or tags to show activity patterns over time.</p>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium">🔄 Flow Analysis</h4>
-              <p className="text-muted-foreground">Shows how events transition between types in sequence. Great for process flows.</p>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium">🔥 Activity Heatmap</h4>
-              <p className="text-muted-foreground">Reveals patterns in event timing and frequency across different time periods.</p>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium">📈 Statistics</h4>
-              <p className="text-muted-foreground">Overview of event counts, types, tags, and position distribution.</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -765,6 +734,9 @@ export function EventSearch() {
                     canLoadPrevious={Number(start) > 0}
                     onLoadNext={loadNext}
                     onLoadPrevious={loadPrevious}
+                    onEventNavigate={(eventId) => {
+                      navigate(`/events/${eventId}`)
+                    }}
                   />
                 </>
               ) : (
